@@ -1,0 +1,46 @@
+name: Tag Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to tag (e.g. v1.2.3)"
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  tag-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v4.2.2
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Determine previous tag
+        id: changelog
+        run: |
+          git fetch --tags --force --prune
+          previous_tag=$(git describe --tags --abbrev=0 --match "v*" 2>/dev/null || true)
+          range="${previous_tag:+$previous_tag..HEAD}"
+          git log --no-merges --pretty='- %s (%h)' ${range:+$range} > release_notes.md
+          echo "previous-tag=$previous_tag" >> "$GITHUB_OUTPUT"
+          echo "note-file=release_notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag
+        uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: ${{ github.event.inputs.version }}
+          tag_prefix: ""
+          fetch_all_tags: true
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@5be0e66d93ac7ed76da52eca8bb058f665c3a5fe # v2.4.2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          body_path: ${{ steps.changelog.outputs.note-file }}
