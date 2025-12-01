@@ -1,0 +1,21 @@
+{
+  "name": "tag-release-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub Action that comments release PRs with merged PRs since the last tag.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "bundle": "npx @vercel/ncc build src/index.ts -o dist",
+    "prepare": "npm run build && npm run bundle"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "@vercel/ncc": "^0.38.3",
+    "typescript": "^5.6.3"
+  }
+}

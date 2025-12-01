@@ -1,0 +1,28 @@
+name: "Tag Release Bridge"
+description: "Comment release PRs with PRs merged into the default branch since the latest tag."
+author: "your-name"
+runs:
+  using: "node20"
+  main: "dist/index.js"
+inputs:
+  token:
+    description: "GitHub token with repo read access"
+    required: true
+    default: "${{ github.token }}"
+  branch_pattern:
+    description: "Regex the PR head ref must match (e.g., release/.+)"
+    required: true
+    default: "release/.+"
+  default_branch:
+    description: "Default branch to inspect (falls back to repo default)"
+    required: false
+outputs:
+  body:
+    description: "Rendered Markdown table of merged PRs"
+  prev_tag:
+    description: "Latest tag name found"
+  count:
+    description: "Number of merged PRs found"
+branding:
+  color: "blue"
+  icon: "bookmark"
