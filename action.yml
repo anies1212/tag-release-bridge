@@ -16,6 +16,10 @@ inputs:
   default_branch:
     description: "Default branch to inspect (falls back to repo default)"
     required: false
+  post_comment:
+    description: "Create/update a PR comment with the generated table"
+    required: false
+    default: "true"
 outputs:
   body:
     description: "Rendered Markdown table of merged PRs"

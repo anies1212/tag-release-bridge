@@ -51,6 +51,8 @@ async function run() {
     const token = core.getInput('token', { required: true });
     const branchPatternInput = core.getInput('branch_pattern', { required: true }) || 'release/.+';
     const defaultBranchInput = core.getInput('default_branch');
+    const postCommentInput = core.getInput('post_comment') || 'true';
+    const postComment = postCommentInput.toLowerCase() === 'true';
 
     const { context } = github;
     const { owner, repo } = context.repo;
@@ -197,6 +199,44 @@ async function run() {
 
     core.setOutput('body', body);
     core.setOutput('count', prMap.size);
+
+    if (postComment) {
+      const pullNumber = context.payload.pull_request?.number;
+      if (!pullNumber) {
+        core.info('No pull_request context; skipping comment');
+        return;
+      }
+
+      const marker = '<!-- tag-release-bridge -->';
+      const bodyWithMarker = `${marker}\n${body}`;
+
+      const comments = await octokit.paginate(octokit.rest.issues.listComments, {
+        owner,
+        repo,
+        issue_number: pullNumber,
+        per_page: 100,
+      });
+
+      const existing = comments.find((c) => typeof c.body === 'string' && c.body.includes(marker));
+
+      if (existing) {
+        await octokit.rest.issues.updateComment({
+          owner,
+          repo,
+          comment_id: existing.id,
+          body: bodyWithMarker,
+        });
+        core.info(`Updated existing comment (id: ${existing.id})`);
+      } else {
+        const created = await octokit.rest.issues.createComment({
+          owner,
+          repo,
+          issue_number: pullNumber,
+          body: bodyWithMarker,
+        });
+        core.info(`Created new comment (id: ${created.data.id})`);
+      }
+    }
   } catch (error) {
     if (error instanceof Error) {
       core.setFailed(error.message);

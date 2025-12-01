@@ -38,6 +38,7 @@ jobs:
         with:
           branch_pattern: release/.+
           default_branch: main
+          post_comment: true
 
       - if: steps.notes.outputs.count != '0'
         uses: peter-evans/create-or-update-comment@v5
