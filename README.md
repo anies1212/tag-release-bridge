@@ -46,6 +46,33 @@ jobs:
           body: ${{ steps.notes.outputs.body }}
 ```
 
+## Output example
+
+Rendered comment body looks like:
+
+```
+PRs merged into main since v1.2.3:
+
+## <img src="https://avatars.githubusercontent.com/u/1234567?s=32" width="20" height="20"> [alice](https://github.com/alice)
+
+### 🚀 Features
+| Title | Link |
+| --- | --- |
+| feat: add retry config | [#123](https://github.com/your-org/your-repo/pull/123) |
+
+### 🐛 Bug Fixes
+| Title | Link |
+| --- | --- |
+| fix: handle 500 errors | [#121](https://github.com/your-org/your-repo/pull/121) |
+
+## <img src="https://avatars.githubusercontent.com/u/222333?s=32" width="20" height="20"> [bob](https://github.com/bob)
+
+### 🧹 Chores
+| Title | Link |
+| --- | --- |
+| chore: bump deps | [#120](https://github.com/your-org/your-repo/pull/120) |
+```
+
 ## Development
 
 ```sh

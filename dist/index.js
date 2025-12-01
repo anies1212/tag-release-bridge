@@ -29963,6 +29963,32 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
 const github = __importStar(__nccwpck_require__(3228));
+const categories = [
+    { key: 'feature', title: 'Features', icon: '🚀', keywords: ['feat'] },
+    { key: 'bug', title: 'Bug Fixes', icon: '🐛', keywords: ['fixes', 'fix', 'hotfix', 'bug'] },
+    { key: 'chore', title: 'Chores', icon: '🧹', keywords: ['chore'] },
+    { key: 'tests', title: 'Tests', icon: '🧪', keywords: ['tests', 'e2e'] },
+    { key: 'refactor', title: 'Refactors', icon: '♻️', keywords: ['refactor'] },
+    { key: 'release', title: 'Release', icon: '🎯', keywords: ['release'] },
+    { key: 'docs', title: 'Docs', icon: '📚', keywords: ['doc'] },
+    { key: 'ci', title: 'CI / Workflow', icon: '⚙️', keywords: ['ci', 'workflow'] },
+    { key: 'other', title: 'Other', icon: '📦', keywords: [] },
+];
+function resolveAvatarUrl(rawUrl) {
+    if (!rawUrl)
+        return '';
+    const separator = rawUrl.includes('?') ? '&' : '?';
+    return `${rawUrl}${separator}s=32`;
+}
+function categorizePR(pr) {
+    const haystack = `${pr.title} ${pr.head?.ref ?? ''}`.toLowerCase();
+    for (const category of categories) {
+        if (category.keywords.length && category.keywords.some((kw) => haystack.includes(kw))) {
+            return category;
+        }
+    }
+    return categories.find((c) => c.key === 'other');
+}
 async function run() {
     try {
         const token = core.getInput('token', { required: true });
@@ -30032,23 +30058,56 @@ async function run() {
             return;
         }
         const mergedPrs = Array.from(prMap.values()).sort((a, b) => {
+            const aAuthor = a.user?.login ?? 'unknown';
+            const bAuthor = b.user?.login ?? 'unknown';
+            if (aAuthor !== bAuthor) {
+                return aAuthor.localeCompare(bAuthor);
+            }
             const aDate = a.merged_at ? Date.parse(a.merged_at) : 0;
             const bDate = b.merged_at ? Date.parse(b.merged_at) : 0;
             return bDate - aDate;
         });
-        let rows = '';
+        const authors = new Map();
         for (const pr of mergedPrs) {
-            const title = pr.title.replace(/\|/g, '\\|');
-            const author = pr.user?.login ? `@${pr.user.login}` : 'unknown';
-            const prLink = `[ #${pr.number} ](${pr.html_url})`;
-            const avatarUrl = pr.user?.avatar_url ? `${pr.user.avatar_url}&s=32` : '';
-            const authorCell = avatarUrl ? `![avatar](${avatarUrl}) ${author}` : author;
-            rows += `| ${prLink} | ${title} | ${authorCell} | ${pr.merged_at ?? ''} |\n`;
+            const login = pr.user?.login ?? 'unknown';
+            const avatar = resolveAvatarUrl(pr.user?.avatar_url);
+            const profileUrl = pr.user?.html_url || (pr.user?.login ? `https://github.com/${pr.user.login}` : '');
+            const authorGroup = authors.get(login) ?? {
+                login,
+                avatar,
+                profileUrl,
+                categories: new Map(),
+            };
+            const category = categorizePR(pr);
+            const list = authorGroup.categories.get(category.key) ?? [];
+            list.push(pr);
+            authorGroup.categories.set(category.key, list);
+            authors.set(login, authorGroup);
         }
-        const body = `PRs merged into ${defaultBranch} since ${prevTag}:\n\n` +
-            `| PR | Title | Author | Merged at |\n` +
-            `| --- | --- | --- | --- |\n` +
-            rows;
+        const sortedAuthors = Array.from(authors.values()).sort((a, b) => a.login.localeCompare(b.login));
+        let body = `PRs merged into ${defaultBranch} since ${prevTag}:\n\n`;
+        for (const author of sortedAuthors) {
+            const avatarImg = author.avatar ? `<img src="${author.avatar}" width="20" height="20"> ` : '';
+            const authorLink = author.login !== 'unknown' ? `[${author.login}](${author.profileUrl})` : 'unknown';
+            body += `## ${avatarImg}${authorLink}\n\n`;
+            for (const category of categories) {
+                const prsForCategory = author.categories.get(category.key);
+                if (!prsForCategory || !prsForCategory.length)
+                    continue;
+                const sortedByDate = [...prsForCategory].sort((a, b) => {
+                    const aDate = a.merged_at ? Date.parse(a.merged_at) : 0;
+                    const bDate = b.merged_at ? Date.parse(b.merged_at) : 0;
+                    return bDate - aDate;
+                });
+                body += `### ${category.icon} ${category.title}\n`;
+                body += `| Title | Link |\n| --- | --- |\n`;
+                for (const pr of sortedByDate) {
+                    const title = pr.title.replace(/\|/g, '\\|');
+                    body += `| ${title} | [#${pr.number}](${pr.html_url}) |\n`;
+                }
+                body += '\n';
+            }
+        }
         core.setOutput('body', body);
         core.setOutput('count', prMap.size);
     }
