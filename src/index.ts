@@ -46,7 +46,7 @@ function categorizePR(pr: PullRequest): Category {
   return categories.find((c) => c.key === 'other') as Category;
 }
 
-async function run() {
+export async function runAction() {
   try {
     const token = core.getInput('token', { required: true });
     const branchPatternInput = core.getInput('branch_pattern', { required: true }) || 'release/.+';
@@ -246,4 +246,7 @@ async function run() {
   }
 }
 
-run();
+if (process.env.NODE_ENV !== 'test') {
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+  runAction();
+}

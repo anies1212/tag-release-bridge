@@ -29961,6 +29961,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.runAction = runAction;
 const core = __importStar(__nccwpck_require__(7484));
 const github = __importStar(__nccwpck_require__(3228));
 const categories = [
@@ -29989,7 +29990,7 @@ function categorizePR(pr) {
     }
     return categories.find((c) => c.key === 'other');
 }
-async function run() {
+async function runAction() {
     try {
         const token = core.getInput('token', { required: true });
         const branchPatternInput = core.getInput('branch_pattern', { required: true }) || 'release/.+';
@@ -30156,7 +30157,10 @@ async function run() {
         }
     }
 }
-run();
+if (process.env.NODE_ENV !== 'test') {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    runAction();
+}
 
 
 /***/ }),
