@@ -7,6 +7,7 @@ Comments release PRs with a table of PRs merged into the default branch since th
 - `token` (required): GitHub token with repo read access. Defaults to `${{ github.token }}`.
 - `branch_pattern` (required): Regex the PR head ref must match. Default: `release/.+`.
 - `default_branch` (optional): Default branch name to inspect. Fallbacks to the repo default.
+- `post_comment` (optional): `true` to create/update a PR comment automatically (default).
 
 ## Outputs
 
@@ -38,13 +39,7 @@ jobs:
         with:
           branch_pattern: release/.+
           default_branch: main
-          post_comment: true
-
-      - if: steps.notes.outputs.count != '0'
-        uses: peter-evans/create-or-update-comment@v5
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body: ${{ steps.notes.outputs.body }}
+          # post_comment defaults to true. Set to false if you only want the outputs.
 ```
 
 ## Output example
