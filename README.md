@@ -34,7 +34,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: your-org/tag-release-bridge@v1
+      - uses: anies1212/tag-release-bridge@v1
         id: notes
         with:
           branch_pattern: release/.+
