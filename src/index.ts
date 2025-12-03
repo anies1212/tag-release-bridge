@@ -162,17 +162,28 @@ export async function runAction() {
     }
 
     const prMap = new Map<number, PullRequest>();
-    for (const commit of commits) {
-      const { data: associated } =
-        await octokit.rest.repos.listPullRequestsAssociatedWithCommit({
-          owner,
-          repo,
-          commit_sha: commit.sha,
-        });
+    const commitShas = commits.map((c) => c.sha);
+    const concurrency = 5;
 
-      for (const pr of associated as unknown as PullRequest[]) {
-        if (pr.base.ref === defaultBranch && pr.merged_at) {
-          prMap.set(pr.number, pr);
+    for (let i = 0; i < commitShas.length; i += concurrency) {
+      const batch = commitShas.slice(i, i + concurrency);
+      const results = await Promise.all(
+        batch.map(async (sha) => {
+          const { data: associated } =
+            await octokit.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner,
+              repo,
+              commit_sha: sha,
+            });
+          return associated as unknown as PullRequest[];
+        }),
+      );
+
+      for (const prs of results) {
+        for (const pr of prs) {
+          if (pr.base.ref === defaultBranch && pr.merged_at) {
+            prMap.set(pr.number, pr);
+          }
         }
       }
     }
