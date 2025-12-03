@@ -1,8 +1,5 @@
 import * as core from "@actions/core";
-import * as fs from "fs/promises";
 import * as github from "@actions/github";
-import path from "path";
-import yaml from "js-yaml";
 
 type PullRequest = {
   number: number;
@@ -16,169 +13,54 @@ type PullRequest = {
     html_url?: string | null;
   };
   html_url: string;
-  labels?: { name?: string | null }[];
 };
 
-type CategoryConfig = {
+type Category = {
+  key: string;
   title: string;
-  labels: string[];
+  icon: string;
+  keywords: string[];
 };
 
-type RawConfig = {
-  template?: string;
-  empty_template?: string;
-  pr_template?: string;
-  categories?: CategoryConfig[];
-  ignore_labels?: string[];
-};
+const categories: Category[] = [
+  { key: "feature", title: "Features", icon: "🚀", keywords: ["feat"] },
+  {
+    key: "bug",
+    title: "Bug Fixes",
+    icon: "🐛",
+    keywords: ["fixes", "fix", "hotfix", "bug"],
+  },
+  { key: "chore", title: "Chores", icon: "🧹", keywords: ["chore"] },
+  { key: "tests", title: "Tests", icon: "🧪", keywords: ["tests", "e2e"] },
+  { key: "refactor", title: "Refactors", icon: "♻️", keywords: ["refactor"] },
+  { key: "release", title: "Release", icon: "🎯", keywords: ["release"] },
+  { key: "docs", title: "Docs", icon: "📚", keywords: ["doc"] },
+  {
+    key: "ci",
+    title: "CI / Workflow",
+    icon: "⚙️",
+    keywords: ["ci", "workflow"],
+  },
+  { key: "other", title: "Other", icon: "📦", keywords: [] },
+];
 
-type ResolvedConfig = {
-  template: string;
-  emptyTemplate: string;
-  prTemplate: string;
-  categories: CategoryConfig[];
-  ignoreLabels: string[];
-  otherTitle: string;
-};
-
-const defaultConfig: ResolvedConfig = {
-  template: [
-    "## 🔖 Release Preview",
-    "Changes since $FROM_TAG → $TO_REF",
-    "",
-    "$CHANGES",
-  ].join("\n"),
-  emptyTemplate: "_No merged pull requests found in this range._",
-  prTemplate: "- $TITLE (#$NUMBER) by @$AUTHOR",
-  categories: [
-    { title: "🚀 Features", labels: ["feature", "feat", "enhancement"] },
-    { title: "🐛 Bug Fixes", labels: ["fix", "bug", "hotfix"] },
-    { title: "📚 Docs", labels: ["doc", "docs", "documentation"] },
-    { title: "🧪 Tests", labels: ["test", "tests", "qa"] },
-    { title: "🧹 Chores", labels: ["chore", "maintenance", "refactor"] },
-    { title: "📦 Dependencies", labels: ["deps", "dependencies"] },
-  ],
-  ignoreLabels: ["skip-changelog", "no-changelog"],
-  otherTitle: "Other changes",
-};
-
-function toLowerSet(values: (string | undefined | null)[]): Set<string> {
-  return new Set(
-    values.filter(Boolean).map((v) => (v as string).toLowerCase()),
-  );
+function resolveAvatarUrl(rawUrl: string | null | undefined): string {
+  if (!rawUrl) return "";
+  const separator = rawUrl.includes("?") ? "&" : "?";
+  return `${rawUrl}${separator}s=32`;
 }
 
-async function loadConfig(configPath: string): Promise<ResolvedConfig> {
-  if (!configPath) return defaultConfig;
-  const fullPath = path.isAbsolute(configPath)
-    ? configPath
-    : path.join(process.cwd(), configPath);
-  try {
-    const raw = await fs.readFile(fullPath, "utf8");
-    const parsed =
-      (configPath.endsWith(".json")
-        ? JSON.parse(raw)
-        : (yaml.load(raw) as RawConfig | null)) || {};
-
-    const categories =
-      Array.isArray(parsed.categories) && parsed.categories.length
-        ? parsed.categories
-        : defaultConfig.categories;
-    const ignoreLabels =
-      parsed.ignore_labels && Array.isArray(parsed.ignore_labels)
-        ? parsed.ignore_labels
-        : defaultConfig.ignoreLabels;
-
-    return {
-      template: parsed.template || defaultConfig.template,
-      emptyTemplate: parsed.empty_template || defaultConfig.emptyTemplate,
-      prTemplate: parsed.pr_template || defaultConfig.prTemplate,
-      categories,
-      ignoreLabels,
-      otherTitle: defaultConfig.otherTitle,
-    };
-  } catch (error) {
-    const err = error as NodeJS.ErrnoException;
-    if (err.code !== "ENOENT") {
-      core.info(
-        `Failed to read configuration at ${configPath}: ${
-          err.message || String(err)
-        }`,
-      );
-    } else {
-      core.info(`Configuration not found at ${configPath}; using defaults`);
+function categorizePR(pr: PullRequest): Category {
+  const haystack = `${pr.title} ${pr.head?.ref ?? ""}`.toLowerCase();
+  for (const category of categories) {
+    if (
+      category.keywords.length &&
+      category.keywords.some((kw) => haystack.includes(kw))
+    ) {
+      return category;
     }
-    return defaultConfig;
   }
-}
-
-function renderTemplate(
-  template: string,
-  pr: PullRequest,
-  categoryTitle: string,
-  fromTag: string,
-  toRef: string,
-): string {
-  const author = pr.user?.login || "unknown";
-  const replacements: Record<string, string> = {
-    TITLE: pr.title,
-    NUMBER: `${pr.number}`,
-    URL: pr.html_url,
-    AUTHOR: author,
-    CATEGORY: categoryTitle,
-    FROM_TAG: fromTag,
-    TO_REF: toRef,
-  };
-
-  let rendered = template;
-  for (const [key, value] of Object.entries(replacements)) {
-    const placeholder = new RegExp(`\\$\\{\\{?${key}\\}?\\}`, "g");
-    const shorthand = new RegExp(`\\$${key}`, "g");
-    rendered = rendered.replace(placeholder, value).replace(shorthand, value);
-  }
-  return rendered;
-}
-
-function renderBody(
-  config: ResolvedConfig,
-  grouped: Map<string, PullRequest[]>,
-  fromTag: string,
-  toRef: string,
-): string {
-  if (!grouped.size) {
-    return config.template
-      .replace(/\$CHANGES/g, config.emptyTemplate)
-      .replace(/\$FROM_TAG/g, fromTag)
-      .replace(/\$TO_REF/g, toRef);
-  }
-
-  const sections: string[] = [];
-  const categoryOrder = [
-    ...config.categories,
-    { title: config.otherTitle, labels: [] },
-  ];
-
-  for (const category of categoryOrder) {
-    const prs = grouped.get(category.title);
-    if (!prs || !prs.length) continue;
-    const sorted = [...prs].sort((a, b) => {
-      const aDate = a.merged_at ? Date.parse(a.merged_at) : 0;
-      const bDate = b.merged_at ? Date.parse(b.merged_at) : 0;
-      return bDate - aDate;
-    });
-    const entries = sorted
-      .map((pr) =>
-        renderTemplate(config.prTemplate, pr, category.title, fromTag, toRef),
-      )
-      .join("\n");
-    sections.push(`### ${category.title}\n${entries}`);
-  }
-
-  const changes = sections.join("\n\n");
-  return config.template
-    .replace(/\$CHANGES/g, changes)
-    .replace(/\$FROM_TAG/g, fromTag)
-    .replace(/\$TO_REF/g, toRef);
+  return categories.find((c) => c.key === "other") as Category;
 }
 
 export async function runAction() {
@@ -187,9 +69,6 @@ export async function runAction() {
     const branchPatternInput =
       core.getInput("branch_pattern", { required: true }) || "release/.+";
     const postCommentInput = core.getInput("post_comment") || "true";
-    const configurationPath =
-      core.getInput("configuration") ||
-      ".github/release-changelog-builder-config.yml";
     const postComment = postCommentInput.toLowerCase() === "true";
 
     const { context } = github;
@@ -215,9 +94,9 @@ export async function runAction() {
     }
 
     const octokit = github.getOctokit(token);
+    const repoInfo = await octokit.rest.repos.get({ owner, repo });
+    const defaultBranch = repoInfo.data.default_branch;
     const headSha = context.payload.pull_request?.head?.sha ?? context.sha;
-    const toRef = headRef || headSha.slice(0, 7);
-    const config = await loadConfig(configurationPath);
 
     const tags = await octokit.paginate(octokit.rest.repos.listTags, {
       owner,
@@ -302,7 +181,7 @@ export async function runAction() {
 
       for (const prs of results) {
         for (const pr of prs) {
-          if (pr.merged_at) {
+          if (pr.base.ref === defaultBranch && pr.merged_at) {
             prMap.set(pr.number, pr);
           }
         }
@@ -316,49 +195,83 @@ export async function runAction() {
       return;
     }
 
-    const pullNumbers = Array.from(prMap.keys());
-    const detailedPrs: PullRequest[] = [];
-    for (let i = 0; i < pullNumbers.length; i += concurrency) {
-      const batch = pullNumbers.slice(i, i + concurrency);
-      const results = await Promise.all(
-        batch.map(async (number) => {
-          const pr = await octokit.rest.pulls.get({
-            owner,
-            repo,
-            pull_number: number,
-          });
-          return pr.data as unknown as PullRequest;
-        }),
-      );
-      for (const pr of results) {
-        detailedPrs.push(pr);
+    const mergedPrs = Array.from(prMap.values()).sort((a, b) => {
+      const aAuthor = a.user?.login ?? "unknown";
+      const bAuthor = b.user?.login ?? "unknown";
+      if (aAuthor !== bAuthor) {
+        return aAuthor.localeCompare(bAuthor);
       }
+      const aDate = a.merged_at ? Date.parse(a.merged_at) : 0;
+      const bDate = b.merged_at ? Date.parse(b.merged_at) : 0;
+      return bDate - aDate;
+    });
+
+    type AuthorGroup = {
+      login: string;
+      avatar: string;
+      profileUrl: string;
+      categories: Map<string, PullRequest[]>;
+    };
+
+    const authors = new Map<string, AuthorGroup>();
+    for (const pr of mergedPrs) {
+      const login = pr.user?.login ?? "unknown";
+      const avatar = resolveAvatarUrl(pr.user?.avatar_url);
+      const profileUrl =
+        pr.user?.html_url ||
+        (pr.user?.login ? `https://github.com/${pr.user.login}` : "");
+      const authorGroup = authors.get(login) ?? {
+        login,
+        avatar,
+        profileUrl,
+        categories: new Map(),
+      };
+
+      const category = categorizePR(pr);
+      const list = authorGroup.categories.get(category.key) ?? [];
+      list.push(pr);
+      authorGroup.categories.set(category.key, list);
+      authors.set(login, authorGroup);
     }
 
-    const ignoreLabels = toLowerSet(config.ignoreLabels);
-    const grouped = new Map<string, PullRequest[]>();
-    const categories = [...config.categories];
+    const sortedAuthors = Array.from(authors.values()).sort((a, b) =>
+      a.login.localeCompare(b.login),
+    );
 
-    for (const pr of detailedPrs) {
-      const labels = toLowerSet(pr.labels?.map((l) => l.name) || []);
-      if (Array.from(labels).some((label) => ignoreLabels.has(label))) {
-        continue;
+    let body = `PRs merged into ${defaultBranch} since ${prevTag}:\n\n`;
+
+    for (const author of sortedAuthors) {
+      const avatarImg = author.avatar
+        ? `<img src="${author.avatar}" width="20" height="20"> `
+        : "";
+      const authorLink =
+        author.login !== "unknown"
+          ? `[${author.login}](${author.profileUrl})`
+          : "unknown";
+      body += `## ${avatarImg}${authorLink}\n\n`;
+
+      for (const category of categories) {
+        const prsForCategory = author.categories.get(category.key);
+        if (!prsForCategory || !prsForCategory.length) continue;
+
+        const sortedByDate = [...prsForCategory].sort((a, b) => {
+          const aDate = a.merged_at ? Date.parse(a.merged_at) : 0;
+          const bDate = b.merged_at ? Date.parse(b.merged_at) : 0;
+          return bDate - aDate;
+        });
+
+        body += `### ${category.icon} ${category.title}\n`;
+        body += `| Title | Link |\n| --- | --- |\n`;
+        for (const pr of sortedByDate) {
+          const title = pr.title.replace(/\|/g, "\\|");
+          body += `| ${title} | [#${pr.number}](${pr.html_url}) |\n`;
+        }
+        body += "\n";
       }
-      const matched = categories.find((category) =>
-        category.labels.some((label) => labels.has(label.toLowerCase())),
-      ) || { title: config.otherTitle, labels: [] };
-      const existing = grouped.get(matched.title) || [];
-      existing.push(pr);
-      grouped.set(matched.title, existing);
     }
-
-    const body = renderBody(config, grouped, prevTag, toRef);
 
     core.setOutput("body", body);
-    core.setOutput(
-      "count",
-      Array.from(grouped.values()).reduce((sum, list) => sum + list.length, 0),
-    );
+    core.setOutput("count", prMap.size);
 
     if (postComment) {
       const pullNumber = context.payload.pull_request?.number;

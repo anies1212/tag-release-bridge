@@ -1,21 +1,16 @@
 # Tag Release Bridge
 
-Comments release PRs with a changelog of PRs merged since the latest tag.  
-Content discovery and grouping follow the same idea as
-[`release-changelog-builder-action`](https://github.com/mikepenz/release-changelog-builder-action)
-(labels → categories, ignore labels, templates). Only the rendered comment style is different.
+Comments release PRs with a table of PRs merged into the default branch since the latest tag.
 
 ## Inputs
 
 - `token` (required): GitHub token with repo read access. Defaults to `${{ github.token }}`.
 - `branch_pattern` (required): Regex the PR head ref must match. Default: `release/.+`.
 - `post_comment` (optional): `true` to create/update a PR comment automatically (default).
-- `configuration` (optional): Path to a release-changelog-builder style config
-  (YAML or JSON). Default: `.github/release-changelog-builder-config.yml`.
 
 ## Outputs
 
-- `body`: Markdown changelog of merged PRs.
+- `body`: Markdown table of merged PRs.
 - `prev_tag`: Latest tag discovered.
 - `count`: Number of merged PRs included.
 
@@ -43,7 +38,6 @@ jobs:
         with:
           branch_pattern: release/.+
           # post_comment defaults to true. Set to false if you only want the outputs.
-          # configuration: .github/release-changelog-builder-config.yml
 ```
 
 ## Output example
@@ -51,17 +45,26 @@ jobs:
 Rendered comment body looks like:
 
 ```
-## 🔖 Release Preview
-Changes since v1.2.3 → release/v1.3.0
+PRs merged into main since v1.2.3:
+
+## <img src="https://avatars.githubusercontent.com/u/1234567?s=32" width="20" height="20"> [alice](https://github.com/alice)
 
 ### 🚀 Features
-- feat: add retry config (#123) by @alice
+| Title | Link |
+| --- | --- |
+| feat: add retry config | [#123](https://github.com/your-org/your-repo/pull/123) |
 
 ### 🐛 Bug Fixes
-- fix: handle 500 errors (#121) by @bob
+| Title | Link |
+| --- | --- |
+| fix: handle 500 errors | [#121](https://github.com/your-org/your-repo/pull/121) |
+
+## <img src="https://avatars.githubusercontent.com/u/222333?s=32" width="20" height="20"> [bob](https://github.com/bob)
 
 ### 🧹 Chores
-- chore: bump deps (#120) by @bob
+| Title | Link |
+| --- | --- |
+| chore: bump deps | [#120](https://github.com/your-org/your-repo/pull/120) |
 ```
 
 ## Development
