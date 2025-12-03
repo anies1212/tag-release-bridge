@@ -117,7 +117,7 @@ describe("runAction", () => {
     expect(bodyCall).toBeTruthy();
     const body = bodyCall[1] as string;
 
-    expect(body).toContain("PRs merged since v1.0.0");
+    expect(body).toContain("PRs merged into main since v1.0.0");
     expect(body).toContain(
       '## <img src="https://avatars.githubusercontent.com/u/1?s=32" width="20" height="20"> [alice](https://github.com/alice)',
     );

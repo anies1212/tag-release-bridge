@@ -1,6 +1,6 @@
 # Tag Release Bridge
 
-Comments release PRs with a table of PRs merged since the latest tag.
+Comments release PRs with a table of PRs merged into the default branch since the latest tag.
 
 ## Inputs
 
@@ -45,7 +45,7 @@ jobs:
 Rendered comment body looks like:
 
 ```
-PRs merged since v1.2.3:
+PRs merged into main since v1.2.3:
 
 ## <img src="https://avatars.githubusercontent.com/u/1234567?s=32" width="20" height="20"> [alice](https://github.com/alice)
 

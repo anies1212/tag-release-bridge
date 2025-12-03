@@ -1,5 +1,5 @@
 name: "Tag Release Bridge"
-description: "Comment release PRs with PRs merged since the latest tag."
+description: "Comment release PRs with PRs merged into the default branch since the latest tag."
 author: "your-name"
 runs:
   using: "node20"
