@@ -1,12 +1,11 @@
 # Tag Release Bridge
 
-Comments release PRs with a table of PRs merged into the default branch since the latest tag.
+Comments release PRs with a table of PRs merged since the latest tag.
 
 ## Inputs
 
 - `token` (required): GitHub token with repo read access. Defaults to `${{ github.token }}`.
 - `branch_pattern` (required): Regex the PR head ref must match. Default: `release/.+`.
-- `default_branch` (optional): Default branch name to inspect. Fallbacks to the repo default.
 - `post_comment` (optional): `true` to create/update a PR comment automatically (default).
 
 ## Outputs
@@ -38,7 +37,6 @@ jobs:
         id: notes
         with:
           branch_pattern: release/.+
-          default_branch: main
           # post_comment defaults to true. Set to false if you only want the outputs.
 ```
 
@@ -47,7 +45,7 @@ jobs:
 Rendered comment body looks like:
 
 ```
-PRs merged into main since v1.2.3:
+PRs merged since v1.2.3:
 
 ## <img src="https://avatars.githubusercontent.com/u/1234567?s=32" width="20" height="20"> [alice](https://github.com/alice)
 

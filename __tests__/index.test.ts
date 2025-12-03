@@ -108,7 +108,6 @@ describe("runAction", () => {
     const core = require("@actions/core");
     core.__inputs["token"] = "fake";
     core.__inputs["branch_pattern"] = "release/.+";
-    core.__inputs["default_branch"] = "main";
     core.__inputs["post_comment"] = "false";
 
     await runAction();
@@ -118,7 +117,7 @@ describe("runAction", () => {
     expect(bodyCall).toBeTruthy();
     const body = bodyCall[1] as string;
 
-    expect(body).toContain("PRs merged into main since v1.0.0");
+    expect(body).toContain("PRs merged since v1.0.0");
     expect(body).toContain(
       '## <img src="https://avatars.githubusercontent.com/u/1?s=32" width="20" height="20"> [alice](https://github.com/alice)',
     );

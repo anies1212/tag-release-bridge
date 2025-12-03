@@ -30005,7 +30005,6 @@ async function runAction() {
     try {
         const token = core.getInput("token", { required: true });
         const branchPatternInput = core.getInput("branch_pattern", { required: true }) || "release/.+";
-        const defaultBranchInput = core.getInput("default_branch");
         const postCommentInput = core.getInput("post_comment") || "true";
         const postComment = postCommentInput.toLowerCase() === "true";
         const { context } = github;
@@ -30029,8 +30028,6 @@ async function runAction() {
             return;
         }
         const octokit = github.getOctokit(token);
-        const repoInfo = await octokit.rest.repos.get({ owner, repo });
-        const defaultBranch = defaultBranchInput || repoInfo.data.default_branch;
         const tags = await octokit.paginate(octokit.rest.repos.listTags, {
             owner,
             repo,
@@ -30087,7 +30084,7 @@ async function runAction() {
                 commit_sha: commit.sha,
             });
             for (const pr of associated) {
-                if (pr.base.ref === defaultBranch && pr.merged_at) {
+                if (pr.merged_at) {
                     prMap.set(pr.number, pr);
                 }
             }
@@ -30127,7 +30124,7 @@ async function runAction() {
             authors.set(login, authorGroup);
         }
         const sortedAuthors = Array.from(authors.values()).sort((a, b) => a.login.localeCompare(b.login));
-        let body = `PRs merged into ${defaultBranch} since ${prevTag}:\n\n`;
+        let body = `PRs merged since ${prevTag}:\n\n`;
         for (const author of sortedAuthors) {
             const avatarImg = author.avatar
                 ? `<img src="${author.avatar}" width="20" height="20"> `

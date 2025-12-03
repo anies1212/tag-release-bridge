@@ -1,5 +1,5 @@
 name: "Tag Release Bridge"
-description: "Comment release PRs with PRs merged into the default branch since the latest tag."
+description: "Comment release PRs with PRs merged since the latest tag."
 author: "your-name"
 runs:
   using: "node20"
@@ -13,9 +13,6 @@ inputs:
     description: "Regex the PR head ref must match (e.g., release/.+)"
     required: true
     default: "release/.+"
-  default_branch:
-    description: "Default branch to inspect (falls back to repo default)"
-    required: false
   post_comment:
     description: "Create/update a PR comment with the generated table"
     required: false

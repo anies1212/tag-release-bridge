@@ -68,7 +68,6 @@ export async function runAction() {
     const token = core.getInput("token", { required: true });
     const branchPatternInput =
       core.getInput("branch_pattern", { required: true }) || "release/.+";
-    const defaultBranchInput = core.getInput("default_branch");
     const postCommentInput = core.getInput("post_comment") || "true";
     const postComment = postCommentInput.toLowerCase() === "true";
 
@@ -96,8 +95,6 @@ export async function runAction() {
     }
 
     const octokit = github.getOctokit(token);
-    const repoInfo = await octokit.rest.repos.get({ owner, repo });
-    const defaultBranch = defaultBranchInput || repoInfo.data.default_branch;
 
     const tags = await octokit.paginate(octokit.rest.repos.listTags, {
       owner,
@@ -172,7 +169,7 @@ export async function runAction() {
         });
 
       for (const pr of associated as unknown as PullRequest[]) {
-        if (pr.base.ref === defaultBranch && pr.merged_at) {
+        if (pr.merged_at) {
           prMap.set(pr.number, pr);
         }
       }
@@ -228,7 +225,7 @@ export async function runAction() {
       a.login.localeCompare(b.login),
     );
 
-    let body = `PRs merged into ${defaultBranch} since ${prevTag}:\n\n`;
+    let body = `PRs merged since ${prevTag}:\n\n`;
 
     for (const author of sortedAuthors) {
       const avatarImg = author.avatar
