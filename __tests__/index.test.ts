@@ -91,15 +91,13 @@ jest.mock("@actions/github", () => {
             createComment: jest.fn().mockResolvedValue({ data: { id: 999 } }),
           },
         },
-        paginate: jest.fn(
-          (fn: any, _opts: any, mapFn?: (r: any) => any[]) => {
-            if (fn === listTagsMock) {
-              return mapFn ? mapFn({ data: tags }) : tags;
-            }
-            // simulate mapper over compareCommits response
-            return mapFn ? mapFn({ data: { commits } }) : commits;
-          },
-        ),
+        paginate: jest.fn((fn: any, _opts: any, mapFn?: (r: any) => any[]) => {
+          if (fn === listTagsMock) {
+            return mapFn ? mapFn({ data: tags }) : tags;
+          }
+          // simulate mapper over compareCommits response
+          return mapFn ? mapFn({ data: { commits } }) : commits;
+        }),
       };
     }),
   };
