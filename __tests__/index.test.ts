@@ -26,6 +26,9 @@ jest.mock("@actions/github", () => {
     },
     getOctokit: jest.fn(() => {
       const commits = [{ sha: "c1" }, { sha: "c2" }];
+      const tags = [{ name: "v2.0.0" }, { name: "v1.0.0" }];
+
+      const listTagsMock = jest.fn().mockResolvedValue({ data: tags });
 
       return {
         rest: {
@@ -33,12 +36,13 @@ jest.mock("@actions/github", () => {
             get: jest.fn().mockResolvedValue({
               data: { default_branch: "main" },
             }),
-            listTags: jest.fn().mockResolvedValue({
-              data: [{ name: "v1.0.0" }],
-            }),
-            compareCommits: jest.fn().mockResolvedValue({
-              data: { commits },
-            }),
+            listTags: listTagsMock,
+            compareCommits: jest
+              .fn()
+              .mockImplementation(({ base }: { base: string }) => {
+                const status = base === "v2.0.0" ? "behind" : "ahead";
+                return Promise.resolve({ data: { status, commits } });
+              }),
             listPullRequestsAssociatedWithCommit: jest
               .fn()
               .mockImplementation(({ commit_sha }: { commit_sha: string }) => {
@@ -87,10 +91,15 @@ jest.mock("@actions/github", () => {
             createComment: jest.fn().mockResolvedValue({ data: { id: 999 } }),
           },
         },
-        paginate: jest.fn((fn: any, _opts: any, mapFn: (r: any) => any[]) => {
-          // simulate mapper over compareCommits response
-          return mapFn({ data: { commits } });
-        }),
+        paginate: jest.fn(
+          (fn: any, _opts: any, mapFn?: (r: any) => any[]) => {
+            if (fn === listTagsMock) {
+              return mapFn ? mapFn({ data: tags }) : tags;
+            }
+            // simulate mapper over compareCommits response
+            return mapFn ? mapFn({ data: { commits } }) : commits;
+          },
+        ),
       };
     }),
   };

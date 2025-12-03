@@ -99,12 +99,12 @@ export async function runAction() {
     const repoInfo = await octokit.rest.repos.get({ owner, repo });
     const defaultBranch = defaultBranchInput || repoInfo.data.default_branch;
 
-    const tags = await octokit.rest.repos.listTags({
+    const tags = await octokit.paginate(octokit.rest.repos.listTags, {
       owner,
       repo,
-      per_page: 1,
+      per_page: 100,
     });
-    if (!tags.data.length) {
+    if (!tags.length) {
       core.info("No tags found; skipping");
       core.setOutput("body", "");
       core.setOutput("prev_tag", "");
@@ -112,7 +112,35 @@ export async function runAction() {
       return;
     }
 
-    const prevTag = tags.data[0].name;
+    let prevTag: string | undefined;
+    for (const tag of tags) {
+      const comparison = await octokit.rest.repos.compareCommits({
+        owner,
+        repo,
+        base: tag.name,
+        head: headSha,
+        per_page: 1,
+      });
+
+      if (
+        comparison.data.status === "ahead" ||
+        comparison.data.status === "identical"
+      ) {
+        prevTag = tag.name;
+        break;
+      }
+    }
+
+    if (!prevTag) {
+      core.info(
+        `No reachable tag found from head "${headSha}"; skipping comparison`,
+      );
+      core.setOutput("body", "");
+      core.setOutput("prev_tag", "");
+      core.setOutput("count", 0);
+      return;
+    }
+
     core.setOutput("prev_tag", prevTag);
 
     const commits = await octokit.paginate(
