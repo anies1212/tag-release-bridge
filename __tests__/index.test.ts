@@ -94,6 +94,49 @@ jest.mock("@actions/github", () => {
             updateComment: jest.fn(),
             createComment: jest.fn().mockResolvedValue({ data: { id: 999 } }),
           },
+          pulls: {
+            get: jest
+              .fn()
+              .mockImplementation(
+                ({ pull_number }: { pull_number: number }) => {
+                  if (pull_number === 123) {
+                    return Promise.resolve({
+                      data: {
+                        number: 123,
+                        title: "feat: add feature",
+                        merged_at: "2024-12-01T00:00:00Z",
+                        base: { ref: "main" },
+                        head: { ref: "feature/new" },
+                        user: {
+                          login: "alice",
+                          avatar_url:
+                            "https://avatars.githubusercontent.com/u/1",
+                          html_url: "https://github.com/alice",
+                        },
+                        html_url: "https://github.com/acme/demo/pull/123",
+                        labels: [{ name: "feature" }],
+                      },
+                    });
+                  }
+                  return Promise.resolve({
+                    data: {
+                      number: 124,
+                      title: "fix: critical bug",
+                      merged_at: "2024-12-02T00:00:00Z",
+                      base: { ref: "main" },
+                      head: { ref: "bug/critical" },
+                      user: {
+                        login: "bob",
+                        avatar_url: "https://avatars.githubusercontent.com/u/2",
+                        html_url: "https://github.com/bob",
+                      },
+                      html_url: "https://github.com/acme/demo/pull/124",
+                      labels: [{ name: "bug" }],
+                    },
+                  });
+                },
+              ),
+          },
         },
         paginate: jest.fn((fn: any, _opts: any, mapFn?: (r: any) => any[]) => {
           if (fn === listTagsMock) {
@@ -108,7 +151,7 @@ jest.mock("@actions/github", () => {
 });
 
 describe("runAction", () => {
-  it("groups PRs by author and category and outputs body", async () => {
+  it("builds a changelog using release-changelog-builder style categories", async () => {
     const core = require("@actions/core");
     core.__inputs["token"] = "fake";
     core.__inputs["branch_pattern"] = "release/.+";
@@ -121,21 +164,12 @@ describe("runAction", () => {
     expect(bodyCall).toBeTruthy();
     const body = bodyCall[1] as string;
 
-    expect(body).toContain("PRs merged into main since v1.0.0");
-    expect(body).toContain(
-      '## <img src="https://avatars.githubusercontent.com/u/1?s=32" width="20" height="20"> [alice](https://github.com/alice)',
-    );
+    expect(body).toContain("Release Preview");
+    expect(body).toContain("since v1.0.0");
     expect(body).toContain("### 🚀 Features");
-    expect(body).toContain(
-      "| feat: add feature | [#123](https://github.com/acme/demo/pull/123) |",
-    );
-    expect(body).toContain(
-      '## <img src="https://avatars.githubusercontent.com/u/2?s=32" width="20" height="20"> [bob](https://github.com/bob)',
-    );
+    expect(body).toContain("- feat: add feature (#123) by @alice");
     expect(body).toContain("### 🐛 Bug Fixes");
-    expect(body).toContain(
-      "| fix: critical bug | [#124](https://github.com/acme/demo/pull/124) |",
-    );
+    expect(body).toContain("- fix: critical bug (#124) by @bob");
 
     const countCall = setOutput.mock.calls.find((c: any[]) => c[0] === "count");
     expect(countCall?.[1]).toBe(2);
