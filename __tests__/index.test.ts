@@ -29,6 +29,9 @@ jest.mock("@actions/github", () => {
       const tags = [{ name: "v2.0.0" }, { name: "v1.0.0" }];
 
       const listTagsMock = jest.fn().mockResolvedValue({ data: tags });
+      const getBranchMock = jest.fn().mockResolvedValue({
+        data: { commit: { sha: "mainsha" } },
+      });
 
       return {
         rest: {
@@ -36,6 +39,7 @@ jest.mock("@actions/github", () => {
             get: jest.fn().mockResolvedValue({
               data: { default_branch: "main" },
             }),
+            getBranch: getBranchMock,
             listTags: listTagsMock,
             compareCommits: jest
               .fn()
@@ -91,13 +95,15 @@ jest.mock("@actions/github", () => {
             createComment: jest.fn().mockResolvedValue({ data: { id: 999 } }),
           },
         },
-        paginate: jest.fn((fn: any, _opts: any, mapFn?: (r: any) => any[]) => {
-          if (fn === listTagsMock) {
-            return mapFn ? mapFn({ data: tags }) : tags;
-          }
-          // simulate mapper over compareCommits response
-          return mapFn ? mapFn({ data: { commits } }) : commits;
-        }),
+        paginate: jest.fn(
+          (fn: any, _opts: any, mapFn?: (r: any) => any[]) => {
+            if (fn === listTagsMock) {
+              return mapFn ? mapFn({ data: tags }) : tags;
+            }
+            // simulate mapper over compareCommits response
+            return mapFn ? mapFn({ data: { commits } }) : commits;
+          },
+        ),
       };
     }),
   };

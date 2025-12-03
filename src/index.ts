@@ -77,7 +77,6 @@ export async function runAction() {
       context.payload.pull_request?.head?.ref ??
       context.ref?.replace("refs/heads/", "") ??
       "";
-    const headSha = context.payload.pull_request?.head?.sha ?? context.sha;
 
     let branchPattern: RegExp;
     try {
@@ -97,6 +96,7 @@ export async function runAction() {
     const octokit = github.getOctokit(token);
     const repoInfo = await octokit.rest.repos.get({ owner, repo });
     const defaultBranch = repoInfo.data.default_branch;
+    const headSha = context.payload.pull_request?.head?.sha ?? context.sha;
 
     const tags = await octokit.paginate(octokit.rest.repos.listTags, {
       owner,
