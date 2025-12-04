@@ -13,6 +13,13 @@ Content discovery and grouping follow the same idea as
 - `configuration` (optional): Path to a release-changelog-builder style config
   (YAML or JSON). Default: `.github/release-changelog-builder-config.yml`.
 
+## Behavior (logic)
+
+- Finds the latest reachable tag from the PR head commit.
+- Collects all commits between that tag and the head, then gathers _all_ merged PRs associated with those commits.
+- Groups PRs by label categories (release-changelog-builder compatible), with ignored labels filtered out.
+- Renders a Markdown changelog using templates (configurable).
+
 ## Outputs
 
 - `body`: Markdown changelog of merged PRs.
@@ -45,6 +52,28 @@ jobs:
           # post_comment defaults to true. Set to false if you only want the outputs.
           # configuration: .github/release-changelog-builder-config.yml
 ```
+
+## Configuration
+
+- Supports the same shape as release-changelog-builder:
+  - `template`, `empty_template`, `pr_template`
+  - `categories` (title + labels[])
+  - `ignore_labels`
+  - `other_title` (optional)
+- Placeholders you can use inside templates: `$TITLE`, `$NUMBER`, `$URL`, `$AUTHOR`, `$CATEGORY`, `$FROM_TAG`, `$TO_REF`.
+- Defaults (when no config file is found):
+  - Template:
+
+    ```
+    ## 🔖 Release Preview
+    Changes since $FROM_TAG → $TO_REF
+
+    $CHANGES
+    ```
+
+  - PR template: `| $TITLE | @$AUTHOR | [#$NUMBER]($URL) |`
+  - Categories: Features, Bug Fixes, Docs, Tests, Chores, Dependencies
+  - Ignore labels: `skip-changelog`, `no-changelog`
 
 ## Output example
 
