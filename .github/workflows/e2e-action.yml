@@ -1,0 +1,48 @@
+name: E2E - Tag Release Bridge
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "dist/**"
+      - "action.yml"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/e2e-action.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  run-action:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build dist
+        run: npm run bundle
+
+      - name: Run Tag Release Bridge (local)
+        id: bridge
+        uses: ./
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch_pattern: release/.+
+          post_comment: true
+
+      - name: Show outputs
+        run: |
+          echo "prev_tag=${{ steps.bridge.outputs.prev_tag }}"
+          echo "count=${{ steps.bridge.outputs.count }}"
+          echo "body:"
+          echo "${{ steps.bridge.outputs.body }}"
