@@ -1,28 +1,16 @@
 # Tag Release Bridge
 
-Comments release PRs with a changelog of PRs merged since the latest tag.  
-Content discovery and grouping follow the same idea as
-[`release-changelog-builder-action`](https://github.com/mikepenz/release-changelog-builder-action)
-(labels → categories, ignore labels, templates). Only the rendered comment style is different.
+Comments release PRs with a table of PRs merged into the default branch since the latest tag.
 
 ## Inputs
 
 - `token` (required): GitHub token with repo read access. Defaults to `${{ github.token }}`.
 - `branch_pattern` (required): Regex the PR head ref must match. Default: `release/.+`.
 - `post_comment` (optional): `true` to create/update a PR comment automatically (default).
-- `configuration` (optional): Path to a release-changelog-builder style config
-  (YAML or JSON). Default: `.github/release-changelog-builder-config.yml`.
-
-## Behavior (logic)
-
-- Finds the latest reachable tag from the PR head commit.
-- Collects all commits between that tag and the head, then gathers _all_ merged PRs associated with those commits.
-- Groups PRs by label categories (release-changelog-builder compatible), with ignored labels filtered out.
-- Renders a Markdown changelog using templates (configurable).
 
 ## Outputs
 
-- `body`: Markdown changelog of merged PRs.
+- `body`: Markdown table of merged PRs.
 - `prev_tag`: Latest tag discovered.
 - `count`: Number of merged PRs included.
 
@@ -50,53 +38,33 @@ jobs:
         with:
           branch_pattern: release/.+
           # post_comment defaults to true. Set to false if you only want the outputs.
-          # configuration: .github/release-changelog-builder-config.yml
 ```
-
-## Configuration
-
-- Supports the same shape as release-changelog-builder:
-  - `template`, `empty_template`, `pr_template`
-  - `categories` (title + labels[])
-  - `ignore_labels`
-  - `other_title` (optional)
-- Placeholders you can use inside templates: `$TITLE`, `$NUMBER`, `$URL`, `$AUTHOR`, `$CATEGORY`, `$FROM_TAG`, `$TO_REF`.
-- Defaults (when no config file is found):
-  - Template:
-
-    ```
-    ## 🔖 Release Preview
-    Changes since $FROM_TAG → $TO_REF
-
-    $CHANGES
-    ```
-
-  - PR template: `| $TITLE | @$AUTHOR | [#$NUMBER]($URL) |`
-  - Categories: Features, Bug Fixes, Docs, Tests, Chores, Dependencies
-  - Ignore labels: `skip-changelog`, `no-changelog`
 
 ## Output example
 
 Rendered comment body looks like:
 
 ```
-## 🔖 Release Preview
-Changes since v1.2.3 → release/v1.3.0
+PRs merged into main since v1.2.3:
+
+## <img src="https://avatars.githubusercontent.com/u/1234567?s=32" width="20" height="20"> [alice](https://github.com/alice)
 
 ### 🚀 Features
-| Title | Author | Link |
-| --- | --- | --- |
-| feat: add retry config | @alice | [#123](https://github.com/your-org/your-repo/pull/123) |
+| Title | Link |
+| --- | --- |
+| feat: add retry config | [#123](https://github.com/your-org/your-repo/pull/123) |
 
 ### 🐛 Bug Fixes
-| Title | Author | Link |
-| --- | --- | --- |
-| fix: handle 500 errors | @bob | [#121](https://github.com/your-org/your-repo/pull/121) |
+| Title | Link |
+| --- | --- |
+| fix: handle 500 errors | [#121](https://github.com/your-org/your-repo/pull/121) |
+
+## <img src="https://avatars.githubusercontent.com/u/222333?s=32" width="20" height="20"> [bob](https://github.com/bob)
 
 ### 🧹 Chores
-| Title | Author | Link |
-| --- | --- | --- |
-| chore: bump deps | @bob | [#120](https://github.com/your-org/your-repo/pull/120) |
+| Title | Link |
+| --- | --- |
+| chore: bump deps | [#120](https://github.com/your-org/your-repo/pull/120) |
 ```
 
 ## Development

@@ -1,5 +1,5 @@
 name: "Tag Release Bridge"
-description: "Comment release PRs with a release-changelog-builder style changelog since the latest tag."
+description: "Comment release PRs with PRs merged into the default branch since the latest tag."
 author: "your-name"
 runs:
   using: "node20"
@@ -17,13 +17,9 @@ inputs:
     description: "Create/update a PR comment with the generated table"
     required: false
     default: "true"
-  configuration:
-    description: "Path to a release-changelog-builder style config (JSON or YAML)"
-    required: false
-    default: ".github/release-changelog-builder-config.yml"
 outputs:
   body:
-    description: "Rendered Markdown table of merged PRs"
+    description: "Rendered Markdown table of merged PRs by author and category"
   prev_tag:
     description: "Latest tag name found"
   count:
