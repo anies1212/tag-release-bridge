@@ -222,8 +222,6 @@ export async function runAction() {
     }
 
     const octokit = github.getOctokit(token);
-    const repoInfo = await octokit.rest.repos.get({ owner, repo });
-    const defaultBranch = repoInfo.data.default_branch;
     const headSha = context.payload.pull_request?.head?.sha ?? context.sha;
     const toRef = headRef || headSha.slice(0, 7);
     const config = await loadConfig(configurationPath);
@@ -311,7 +309,7 @@ export async function runAction() {
 
       for (const prs of results) {
         for (const pr of prs) {
-          if (pr.base.ref === defaultBranch && pr.merged_at) {
+          if (pr.merged_at) {
             prMap.set(pr.number, pr);
           }
         }
