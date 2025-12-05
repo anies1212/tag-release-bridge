@@ -5,6 +5,7 @@ type PullRequest = {
   number: number;
   title: string;
   merged_at: string | null;
+  merge_commit_sha: string | null;
   base: { ref: string };
   head?: { ref?: string | null };
   user?: {
@@ -163,6 +164,8 @@ export async function runAction() {
 
     const prMap = new Map<number, PullRequest>();
     const commitShas = commits.map((c) => c.sha);
+    // Create a Set of commit SHAs for fast lookup to verify PR merge commits are in range
+    const commitShaSet = new Set(commitShas);
     const concurrency = 5;
 
     for (let i = 0; i < commitShas.length; i += concurrency) {
@@ -181,7 +184,15 @@ export async function runAction() {
 
       for (const prs of results) {
         for (const pr of prs) {
-          if (pr.base.ref === defaultBranch && pr.merged_at) {
+          // Only include PRs that:
+          // 1. Were merged into the default branch
+          // 2. Have a merge_commit_sha that exists in our commit range
+          if (
+            pr.base.ref === defaultBranch &&
+            pr.merged_at &&
+            pr.merge_commit_sha &&
+            commitShaSet.has(pr.merge_commit_sha)
+          ) {
             prMap.set(pr.number, pr);
           }
         }
