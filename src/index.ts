@@ -99,6 +99,15 @@ export async function runAction() {
     const defaultBranch = repoInfo.data.default_branch;
     const headSha = context.payload.pull_request?.head?.sha ?? context.sha;
 
+    // Get the current HEAD of the default branch (main)
+    const { data: mainBranchData } = await octokit.rest.repos.getBranch({
+      owner,
+      repo,
+      branch: defaultBranch,
+    });
+    const mainHeadSha = mainBranchData.commit.sha;
+    core.info(`Default branch (${defaultBranch}) HEAD: ${mainHeadSha}`);
+
     const tags = await octokit.paginate(octokit.rest.repos.listTags, {
       owner,
       repo,
@@ -112,44 +121,21 @@ export async function runAction() {
       return;
     }
 
-    // Get merge-base between release branch and main to find the divergence point
-    // This allows us to find tags that are ancestors of where the branch diverged,
-    // which works for both:
-    // - Case 1: Tag exists before release branch was created
-    // - Case 2: Tag was created on main after release branch diverged
-    const branchComparison = await octokit.rest.repos.compareCommits({
-      owner,
-      repo,
-      base: defaultBranch,
-      head: headSha,
-      per_page: 1,
-    });
-    const mergeBase = branchComparison.data.merge_base_commit?.sha;
-
-    if (!mergeBase) {
-      core.info(
-        "Could not determine merge-base between release branch and main; skipping",
-      );
-      core.setOutput("body", "");
-      core.setOutput("prev_tag", "");
-      core.setOutput("count", 0);
-      return;
-    }
-
-    core.info(
-      `Merge-base between ${headRef} and ${defaultBranch}: ${mergeBase}`,
-    );
-    core.info(`HEAD SHA: ${headSha}`);
+    // Find the latest tag that is an ancestor of the default branch (main)
+    // This matches the behavior of actions-ecosystem/action-get-latest-tag
+    core.info(`Release branch HEAD SHA: ${headSha}`);
     core.info(`Tags found: ${tags.map((t) => t.name).join(", ")}`);
 
     let prevTag: string | undefined;
     for (const tag of tags) {
-      core.info(`Checking tag ${tag.name} against merge-base ${mergeBase}...`);
+      core.info(
+        `Checking tag ${tag.name} against ${defaultBranch} HEAD ${mainHeadSha}...`,
+      );
       const comparison = await octokit.rest.repos.compareCommits({
         owner,
         repo,
         base: tag.name,
-        head: mergeBase,
+        head: mainHeadSha,
         per_page: 1,
       });
       core.info(`  -> status: ${comparison.data.status}`);
@@ -166,7 +152,7 @@ export async function runAction() {
 
     if (!prevTag) {
       core.info(
-        `No reachable tag found from head "${headSha}"; skipping comparison`,
+        `No reachable tag found from ${defaultBranch} HEAD; skipping comparison`,
       );
       core.setOutput("body", "");
       core.setOutput("prev_tag", "");
@@ -176,20 +162,18 @@ export async function runAction() {
 
     core.setOutput("prev_tag", prevTag);
     core.info(
-      `Comparing commits between ${prevTag} and merge-base ${mergeBase}`,
+      `Comparing commits between ${prevTag} and ${defaultBranch} HEAD ${mainHeadSha}`,
     );
 
-    // Compare prevTag to merge-base (not headSha) to get only the commits
-    // that were merged into main between the tag and where this branch diverged.
-    // This prevents including commits from the release branch itself or
-    // commits that happened after the branch diverged.
+    // Compare prevTag to main HEAD to get all commits merged into main since the tag
+    // This matches the behavior of release-changelog-builder-action
     const commits = await octokit.paginate(
       octokit.rest.repos.compareCommits,
       {
         owner,
         repo,
         base: prevTag,
-        head: mergeBase,
+        head: mainHeadSha,
         per_page: 100,
       },
       (response) => response.data.commits,
@@ -198,7 +182,7 @@ export async function runAction() {
     core.info(`Found ${commits.length} commits in range`);
 
     if (!commits.length) {
-      core.info(`No commits found between ${prevTag} and ${mergeBase}`);
+      core.info(`No commits found between ${prevTag} and ${mainHeadSha}`);
       core.setOutput("body", "");
       core.setOutput("count", 0);
       return;
