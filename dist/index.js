@@ -30042,18 +30042,44 @@ async function runAction() {
             core.setOutput("count", 0);
             return;
         }
+        // Get merge-base between release branch and main to find the divergence point
+        // This allows us to find tags that are ancestors of where the branch diverged,
+        // which works for both:
+        // - Case 1: Tag exists before release branch was created
+        // - Case 2: Tag was created on main after release branch diverged
+        const branchComparison = await octokit.rest.repos.compareCommits({
+            owner,
+            repo,
+            base: defaultBranch,
+            head: headSha,
+            per_page: 1,
+        });
+        const mergeBase = branchComparison.data.merge_base_commit?.sha;
+        if (!mergeBase) {
+            core.info("Could not determine merge-base between release branch and main; skipping");
+            core.setOutput("body", "");
+            core.setOutput("prev_tag", "");
+            core.setOutput("count", 0);
+            return;
+        }
+        core.info(`Merge-base between ${headRef} and ${defaultBranch}: ${mergeBase}`);
+        core.info(`HEAD SHA: ${headSha}`);
+        core.info(`Tags found: ${tags.map((t) => t.name).join(", ")}`);
         let prevTag;
         for (const tag of tags) {
+            core.info(`Checking tag ${tag.name} against merge-base ${mergeBase}...`);
             const comparison = await octokit.rest.repos.compareCommits({
                 owner,
                 repo,
                 base: tag.name,
-                head: headSha,
+                head: mergeBase,
                 per_page: 1,
             });
+            core.info(`  -> status: ${comparison.data.status}`);
             if (comparison.data.status === "ahead" ||
                 comparison.data.status === "identical") {
                 prevTag = tag.name;
+                core.info(`  -> Selected ${tag.name} as prevTag`);
                 break;
             }
         }
@@ -30065,15 +30091,21 @@ async function runAction() {
             return;
         }
         core.setOutput("prev_tag", prevTag);
+        core.info(`Comparing commits between ${prevTag} and merge-base ${mergeBase}`);
+        // Compare prevTag to merge-base (not headSha) to get only the commits
+        // that were merged into main between the tag and where this branch diverged.
+        // This prevents including commits from the release branch itself or
+        // commits that happened after the branch diverged.
         const commits = await octokit.paginate(octokit.rest.repos.compareCommits, {
             owner,
             repo,
             base: prevTag,
-            head: headSha,
+            head: mergeBase,
             per_page: 100,
         }, (response) => response.data.commits);
+        core.info(`Found ${commits.length} commits in range`);
         if (!commits.length) {
-            core.info(`No commits found between ${prevTag} and ${headSha}`);
+            core.info(`No commits found between ${prevTag} and ${mergeBase}`);
             core.setOutput("body", "");
             core.setOutput("count", 0);
             return;
