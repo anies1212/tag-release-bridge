@@ -175,15 +175,21 @@ export async function runAction() {
     }
 
     core.setOutput("prev_tag", prevTag);
-    core.info(`Comparing commits between ${prevTag} and ${headSha}`);
+    core.info(
+      `Comparing commits between ${prevTag} and merge-base ${mergeBase}`,
+    );
 
+    // Compare prevTag to merge-base (not headSha) to get only the commits
+    // that were merged into main between the tag and where this branch diverged.
+    // This prevents including commits from the release branch itself or
+    // commits that happened after the branch diverged.
     const commits = await octokit.paginate(
       octokit.rest.repos.compareCommits,
       {
         owner,
         repo,
         base: prevTag,
-        head: headSha,
+        head: mergeBase,
         per_page: 100,
       },
       (response) => response.data.commits,
@@ -192,7 +198,7 @@ export async function runAction() {
     core.info(`Found ${commits.length} commits in range`);
 
     if (!commits.length) {
-      core.info(`No commits found between ${prevTag} and ${headSha}`);
+      core.info(`No commits found between ${prevTag} and ${mergeBase}`);
       core.setOutput("body", "");
       core.setOutput("count", 0);
       return;
