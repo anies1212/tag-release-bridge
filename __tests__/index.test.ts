@@ -43,21 +43,23 @@ jest.mock("@actions/github", () => {
             listTags: listTagsMock,
             compareCommits: jest
               .fn()
-              .mockImplementation(({ base, head }: { base: string; head: string }) => {
-                // When comparing with main to get merge-base
-                if (base === "main") {
-                  return Promise.resolve({
-                    data: {
-                      status: "ahead",
-                      merge_base_commit: { sha: "mergebasesha" },
-                      commits,
-                    },
-                  });
-                }
-                // When comparing tags with merge-base
-                const status = base === "v2.0.0" ? "behind" : "ahead";
-                return Promise.resolve({ data: { status, commits } });
-              }),
+              .mockImplementation(
+                ({ base, head }: { base: string; head: string }) => {
+                  // When comparing with main to get merge-base
+                  if (base === "main") {
+                    return Promise.resolve({
+                      data: {
+                        status: "ahead",
+                        merge_base_commit: { sha: "mergebasesha" },
+                        commits,
+                      },
+                    });
+                  }
+                  // When comparing tags with merge-base
+                  const status = base === "v2.0.0" ? "behind" : "ahead";
+                  return Promise.resolve({ data: { status, commits } });
+                },
+              ),
             listPullRequestsAssociatedWithCommit: jest
               .fn()
               .mockImplementation(({ commit_sha }: { commit_sha: string }) => {

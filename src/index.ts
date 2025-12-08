@@ -136,7 +136,9 @@ export async function runAction() {
       return;
     }
 
-    core.info(`Merge-base between ${headRef} and ${defaultBranch}: ${mergeBase}`);
+    core.info(
+      `Merge-base between ${headRef} and ${defaultBranch}: ${mergeBase}`,
+    );
 
     let prevTag: string | undefined;
     for (const tag of tags) {
