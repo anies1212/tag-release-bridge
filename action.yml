@@ -17,6 +17,12 @@ inputs:
     description: "Create/update a PR comment with the generated table"
     required: false
     default: "true"
+  from:
+    description: "Base commit/tag for comparison (optional, overrides auto-detection)"
+    required: false
+  to:
+    description: "Head commit/ref for comparison (optional, defaults to main HEAD)"
+    required: false
 outputs:
   body:
     description: "Rendered Markdown table of merged PRs by author and category"

@@ -30007,6 +30007,8 @@ async function runAction() {
         const branchPatternInput = core.getInput("branch_pattern", { required: true }) || "release/.+";
         const postCommentInput = core.getInput("post_comment") || "true";
         const postComment = postCommentInput.toLowerCase() === "true";
+        const fromInput = core.getInput("from") || "";
+        const toInput = core.getInput("to") || "";
         const { context } = github;
         const { owner, repo } = context.repo;
         const headRef = context.payload.pull_request?.head?.ref ??
@@ -30038,61 +30040,70 @@ async function runAction() {
         });
         const mainHeadSha = mainBranchData.commit.sha;
         core.info(`Default branch (${defaultBranch}) HEAD: ${mainHeadSha}`);
-        const tags = await octokit.paginate(octokit.rest.repos.listTags, {
-            owner,
-            repo,
-            per_page: 100,
-        });
-        if (!tags.length) {
-            core.info("No tags found; skipping");
-            core.setOutput("body", "");
-            core.setOutput("prev_tag", "");
-            core.setOutput("count", 0);
-            return;
+        // Determine 'from' (base) - use input or auto-detect from tags
+        let fromRef;
+        if (fromInput) {
+            fromRef = fromInput;
+            core.info(`Using provided 'from' input: ${fromRef}`);
         }
-        // Find the latest tag that is an ancestor of the default branch (main)
-        // This matches the behavior of actions-ecosystem/action-get-latest-tag
-        core.info(`Release branch HEAD SHA: ${headSha}`);
-        core.info(`Tags found: ${tags.map((t) => t.name).join(", ")}`);
-        let prevTag;
-        for (const tag of tags) {
-            core.info(`Checking tag ${tag.name} against ${defaultBranch} HEAD ${mainHeadSha}...`);
-            const comparison = await octokit.rest.repos.compareCommits({
+        else {
+            // Auto-detect from tags
+            const tags = await octokit.paginate(octokit.rest.repos.listTags, {
                 owner,
                 repo,
-                base: tag.name,
-                head: mainHeadSha,
-                per_page: 1,
+                per_page: 100,
             });
-            core.info(`  -> status: ${comparison.data.status}`);
-            if (comparison.data.status === "ahead" ||
-                comparison.data.status === "identical") {
-                prevTag = tag.name;
-                core.info(`  -> Selected ${tag.name} as prevTag`);
-                break;
+            if (!tags.length) {
+                core.info("No tags found; skipping");
+                core.setOutput("body", "");
+                core.setOutput("prev_tag", "");
+                core.setOutput("count", 0);
+                return;
             }
+            core.info(`Release branch HEAD SHA: ${headSha}`);
+            core.info(`Tags found: ${tags.map((t) => t.name).join(", ")}`);
+            let prevTag;
+            for (const tag of tags) {
+                core.info(`Checking tag ${tag.name} against ${defaultBranch} HEAD ${mainHeadSha}...`);
+                const comparison = await octokit.rest.repos.compareCommits({
+                    owner,
+                    repo,
+                    base: tag.name,
+                    head: mainHeadSha,
+                    per_page: 1,
+                });
+                core.info(`  -> status: ${comparison.data.status}`);
+                if (comparison.data.status === "ahead" ||
+                    comparison.data.status === "identical") {
+                    prevTag = tag.name;
+                    core.info(`  -> Selected ${tag.name} as prevTag`);
+                    break;
+                }
+            }
+            if (!prevTag) {
+                core.info(`No reachable tag found from ${defaultBranch} HEAD; skipping comparison`);
+                core.setOutput("body", "");
+                core.setOutput("prev_tag", "");
+                core.setOutput("count", 0);
+                return;
+            }
+            fromRef = prevTag;
         }
-        if (!prevTag) {
-            core.info(`No reachable tag found from ${defaultBranch} HEAD; skipping comparison`);
-            core.setOutput("body", "");
-            core.setOutput("prev_tag", "");
-            core.setOutput("count", 0);
-            return;
-        }
-        core.setOutput("prev_tag", prevTag);
-        core.info(`Comparing commits between ${prevTag} and ${defaultBranch} HEAD ${mainHeadSha}`);
-        // Compare prevTag to main HEAD to get all commits merged into main since the tag
-        // This matches the behavior of release-changelog-builder-action
+        // Determine 'to' (head) - use input or default to main HEAD
+        const toRef = toInput || mainHeadSha;
+        core.info(`Using 'to' ref: ${toRef}`);
+        core.setOutput("prev_tag", fromRef);
+        core.info(`Comparing commits between ${fromRef} and ${toRef}`);
         const commits = await octokit.paginate(octokit.rest.repos.compareCommits, {
             owner,
             repo,
-            base: prevTag,
-            head: mainHeadSha,
+            base: fromRef,
+            head: toRef,
             per_page: 100,
         }, (response) => response.data.commits);
         core.info(`Found ${commits.length} commits in range`);
         if (!commits.length) {
-            core.info(`No commits found between ${prevTag} and ${mainHeadSha}`);
+            core.info(`No commits found between ${fromRef} and ${toRef}`);
             core.setOutput("body", "");
             core.setOutput("count", 0);
             return;
@@ -30177,7 +30188,7 @@ async function runAction() {
             authors.set(login, authorGroup);
         }
         const sortedAuthors = Array.from(authors.values()).sort((a, b) => a.login.localeCompare(b.login));
-        let body = `PRs merged into ${defaultBranch} since ${prevTag}:\n\n`;
+        let body = `PRs merged into ${defaultBranch} since ${fromRef}:\n\n`;
         for (const author of sortedAuthors) {
             const avatarImg = author.avatar
                 ? `<img src="${author.avatar}" width="20" height="20"> `
