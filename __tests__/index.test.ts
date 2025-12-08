@@ -57,6 +57,7 @@ jest.mock("@actions/github", () => {
                         number: 123,
                         title: "feat: add feature",
                         merged_at: "2024-12-01T00:00:00Z",
+                        merge_commit_sha: "c1",
                         base: { ref: "main" },
                         head: { ref: "feature/new" },
                         user: {
@@ -76,6 +77,7 @@ jest.mock("@actions/github", () => {
                       number: 124,
                       title: "fix: critical bug",
                       merged_at: "2024-12-02T00:00:00Z",
+                      merge_commit_sha: "c2",
                       base: { ref: "main" },
                       head: { ref: "bug/critical" },
                       user: {
