@@ -139,9 +139,12 @@ export async function runAction() {
     core.info(
       `Merge-base between ${headRef} and ${defaultBranch}: ${mergeBase}`,
     );
+    core.info(`HEAD SHA: ${headSha}`);
+    core.info(`Tags found: ${tags.map((t) => t.name).join(", ")}`);
 
     let prevTag: string | undefined;
     for (const tag of tags) {
+      core.info(`Checking tag ${tag.name} against merge-base ${mergeBase}...`);
       const comparison = await octokit.rest.repos.compareCommits({
         owner,
         repo,
@@ -149,12 +152,14 @@ export async function runAction() {
         head: mergeBase,
         per_page: 1,
       });
+      core.info(`  -> status: ${comparison.data.status}`);
 
       if (
         comparison.data.status === "ahead" ||
         comparison.data.status === "identical"
       ) {
         prevTag = tag.name;
+        core.info(`  -> Selected ${tag.name} as prevTag`);
         break;
       }
     }
@@ -170,6 +175,7 @@ export async function runAction() {
     }
 
     core.setOutput("prev_tag", prevTag);
+    core.info(`Comparing commits between ${prevTag} and ${headSha}`);
 
     const commits = await octokit.paginate(
       octokit.rest.repos.compareCommits,
@@ -182,6 +188,8 @@ export async function runAction() {
       },
       (response) => response.data.commits,
     );
+
+    core.info(`Found ${commits.length} commits in range`);
 
     if (!commits.length) {
       core.info(`No commits found between ${prevTag} and ${headSha}`);
