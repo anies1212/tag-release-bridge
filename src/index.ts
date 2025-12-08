@@ -112,13 +112,39 @@ export async function runAction() {
       return;
     }
 
+    // Get merge-base between release branch and main to find the divergence point
+    // This allows us to find tags that are ancestors of where the branch diverged,
+    // which works for both:
+    // - Case 1: Tag exists before release branch was created
+    // - Case 2: Tag was created on main after release branch diverged
+    const branchComparison = await octokit.rest.repos.compareCommits({
+      owner,
+      repo,
+      base: defaultBranch,
+      head: headSha,
+      per_page: 1,
+    });
+    const mergeBase = branchComparison.data.merge_base_commit?.sha;
+
+    if (!mergeBase) {
+      core.info(
+        "Could not determine merge-base between release branch and main; skipping",
+      );
+      core.setOutput("body", "");
+      core.setOutput("prev_tag", "");
+      core.setOutput("count", 0);
+      return;
+    }
+
+    core.info(`Merge-base between ${headRef} and ${defaultBranch}: ${mergeBase}`);
+
     let prevTag: string | undefined;
     for (const tag of tags) {
       const comparison = await octokit.rest.repos.compareCommits({
         owner,
         repo,
         base: tag.name,
-        head: headSha,
+        head: mergeBase,
         per_page: 1,
       });
 
