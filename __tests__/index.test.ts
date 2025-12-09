@@ -166,7 +166,6 @@ describe("runAction", () => {
   it("groups PRs by author and category and outputs body", async () => {
     const core = require("@actions/core");
     core.__inputs["token"] = "fake";
-    core.__inputs["branch_pattern"] = "release/.+";
     core.__inputs["post_comment"] = "false";
 
     await runAction();

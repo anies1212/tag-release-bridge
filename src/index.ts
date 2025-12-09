@@ -67,8 +67,6 @@ function categorizePR(pr: PullRequest): Category {
 export async function runAction() {
   try {
     const token = core.getInput("token", { required: true });
-    const branchPatternInput =
-      core.getInput("branch_pattern", { required: true }) || "release/.+";
     const postCommentInput = core.getInput("post_comment") || "true";
     const postComment = postCommentInput.toLowerCase() === "true";
     const fromInput = core.getInput("from") || "";
@@ -76,25 +74,6 @@ export async function runAction() {
 
     const { context } = github;
     const { owner, repo } = context.repo;
-    const headRef =
-      context.payload.pull_request?.head?.ref ??
-      context.ref?.replace("refs/heads/", "") ??
-      "";
-
-    let branchPattern: RegExp;
-    try {
-      branchPattern = new RegExp(branchPatternInput);
-    } catch (error) {
-      throw new Error(`Invalid branch_pattern regex: ${branchPatternInput}`);
-    }
-
-    if (!branchPattern.test(headRef)) {
-      core.info(`Ref "${headRef}" does not match branch_pattern; skipping`);
-      core.setOutput("body", "");
-      core.setOutput("prev_tag", "");
-      core.setOutput("count", 0);
-      return;
-    }
 
     const octokit = github.getOctokit(token);
     const repoInfo = await octokit.rest.repos.get({ owner, repo });

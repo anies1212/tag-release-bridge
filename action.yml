@@ -9,10 +9,6 @@ inputs:
     description: "GitHub token with repo read access"
     required: true
     default: "${{ github.token }}"
-  branch_pattern:
-    description: "Regex the PR head ref must match (e.g., release/.+)"
-    required: true
-    default: "release/.+"
   post_comment:
     description: "Create/update a PR comment with the generated table"
     required: false
